@@ -98,8 +98,13 @@ def angoloInclinazione(landmarks):
 # Initialize the webcam
 cap = cv2.VideoCapture(0)
 drawMode = False
-old_drawing = []
 drawingPoints = []
+colors = [(255, 255, 255), (0, 0, 0), (0, 0, 255), (255, 0, 0), (0, 255, 0)]
+colorNames = ("white", "black", "red", "blue", "green")
+thickness = 3
+color = 0
+segments = {}
+segment = 1
 
 while True:
     # Read each frame from the webcam
@@ -122,27 +127,49 @@ while True:
     #switch on/off drawing mode
     if cv2.waitKey(1) == ord('d'):
         drawMode = not drawMode
-        if not drawMode:
-            old_drawing = []
-            for point in drawingPoints:
-                old_drawing.append(point)
-            drawingPoints = []
-                    
+        drawingPoints = []
+        if drawMode:
+            segments["segment"+str(segment)] = (drawingPoints, colors[color], thickness)
+            segment += 1
+            
+
+    #switch between colors
+    if cv2.waitKey(1) == ord('c'):
+        color -= 1
+        drawingPoints = []
+        if drawMode:
+            segments["segment"+str(segment)] = (drawingPoints, colors[color], thickness)
+            segment += 1
+
+
+    #increase or decrease thickness
+    if cv2.waitKey(1) == ord('t'):
+        thickness += 1
+        drawingPoints = []
+        if drawMode:
+            segments["segment"+str(segment)] = (drawingPoints, colors[color], thickness)
+            segment += 1
+    elif cv2.waitKey(1) == ord('y'):
+        thickness -= 1
+        drawingPoints = []
+        if drawMode:
+            segments["segment"+str(segment)] = (drawingPoints, colors[color], thickness)
+            segment += 1
+
 
     #erase screen
     if cv2.waitKey(1) == ord('x'):
         drawMode = False
-        drawingPoints = []
-        old_drawing = []
+        segments = {}
+        segment = 1
 
     # post process the result
     if result.multi_hand_landmarks:
 
         landmarks = []
         for handslms in result.multi_hand_landmarks:
-
-            indiceMano = result.multi_hand_landmarks.index(handslms)
-            etichettaMano = result.multi_handedness[indiceMano].classification[0].label
+            # indiceMano = result.multi_hand_landmarks.index(handslms)
+            # etichettaMano = result.multi_handedness[indiceMano].classification[0].label
             for lm in handslms.landmark:
                 # print(id, lm)
                 lmx = int(lm.x * x)
@@ -151,6 +178,7 @@ while True:
                 landmarks.append((lmx, lmy))
             if drawMode:
                 drawingPoints.append((landmarks[8][0], landmarks[8][1]))
+            
 
 
             # Drawing landmarks on frames
@@ -168,14 +196,16 @@ while True:
             # cv2.putText(frame, str(gradi), [10, 60], cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,255,0), 2)
 
     #Disegno partendo dall'indice    
-    if drawMode:
-        cv2.polylines(frame, [np.array(drawingPoints)], False, (255, 255, 255), 3)
-    else:
-        cv2.polylines(frame, [np.array(old_drawing)], False, (255, 255, 255), 3)
+    for i in range(len(segments)):
+        points = [np.array(segments["segment"+str(i + 1)][0])]
+        lineColor = segments["segment"+str(i + 1)][1]
+        lineThickness = segments["segment"+str(i + 1)][2]
+        cv2.polylines(frame, points, False, lineColor, lineThickness)
 
         
-    cv2.putText(frame, "Draw Mode: "+("enabled" if drawMode else "disabled"), [10, 20], cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0) if drawMode else (0, 0, 255), 2)
-
+    cv2.putText(frame, "Draw Mode: "+("enabled" if drawMode else "disabled"), [10, 25], cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0) if drawMode else (0, 0, 255), 2)
+    cv2.putText(frame, "Color: "+colorNames[color], [10, 60], cv2.FONT_HERSHEY_SIMPLEX, 1, colors[color], 2)
+    cv2.putText(frame, "Thickness: "+str(thickness), [10, 95], cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
             
 
             # # Predict gesture
