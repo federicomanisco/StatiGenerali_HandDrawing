@@ -1,8 +1,4 @@
-# TechVidvan hand Gesture Recognizer
-
 # import necessary packages
-
-import time
 import math
 import cv2
 import numpy as np
@@ -40,6 +36,15 @@ def verso(landmarks, mano):
 
 #conta il numero di dita
 def numeroDita(landmarks, mano, verso):
+    stato = statoDita(landmarks, mano, verso)
+    quante = 0
+    for i, s in enumerate(stato):
+        if i !=0 and s:
+            quante+=1
+    return quante
+
+#conta il numero di dita
+def statoDita(landmarks, mano, verso):
     fingersUp = [False, False, False, False, False]
 
     #pollice (dipende dalla mano e dal verso della mano)
@@ -150,7 +155,7 @@ while True:
 
 
             # Predict gesture
-            prediction = model.predict([landmarks])
+            prediction = model.predict([landmarks], verbose = False)
             # print(prediction)
             classID = np.argmax(prediction)
             className = classNames[classID]
@@ -181,7 +186,7 @@ while True:
                 enableColorSwitch = True
 
             #switch on/off drawing mode
-            if numeroDita(landmarks, etichettaMano, verso(landmarks, etichettaMano))[1]:
+            if numeroDita(landmarks, etichettaMano, verso(landmarks, etichettaMano)) == 1 and statoDita(landmarks, etichettaMano, verso(landmarks, etichettaMano))[1]:
                 if enableDrawModeSwitch:
                     drawMode = True
                     drawModeswitches+=1
@@ -194,9 +199,21 @@ while True:
                     drawModeswitches = 0
                     drawingPoints = []
 
+#            if numeroDita(landmarks, etichettaMano, verso(landmarks, etichettaMano))[1]:
+#                if enableDrawModeSwitch:
+#                    drawMode = True
+#                    drawModeswitches+=1
+#                    if drawMode and drawModeswitches == 1:
+#                        segments["segment"+str(segment)] = (drawingPoints, colors[color], thickness)
+#                        segment += 1
+#            else:
+#                if enableDrawModeSwitch:
+#                    drawMode = False
+#                    drawModeswitches = 0
+#                    drawingPoints = []
 
             #switch between colors
-            if numeroDita(landmarks, etichettaMano, verso(landmarks, etichettaMano))[0]:
+            if statoDita(landmarks, etichettaMano, verso(landmarks, etichettaMano))[0]:
                 if enableColorSwitch:
                     colorSwitches += 1
                     if colorSwitches == 1:
@@ -213,7 +230,7 @@ while True:
                 enableDrawModeSwitch = False
 
             #erase screen
-            if numeroDita(landmarks, etichettaMano, verso(landmarks, etichettaMano))[1] and numeroDita(landmarks, etichettaMano, verso(landmarks, etichettaMano))[2]:
+            if statoDita(landmarks, etichettaMano, verso(landmarks, etichettaMano))[1] and statoDita(landmarks, etichettaMano, verso(landmarks, etichettaMano))[2]:
                 if abs(landmarks[8][0] - landmarks[12][0]) < 30 and abs(landmarks[8][1] - landmarks[12][1]) < 30:
                     enableDrawModeSwitch = False
                     enableColorSwitch = False
