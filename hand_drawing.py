@@ -2,12 +2,15 @@
 
 # import necessary packages
 
+import time
 import math
 import cv2
 import numpy as np
 import mediapipe as mp
 import tensorflow as tf
 from keras.models import load_model
+
+
 
 # initialize mediapipe
 mpHands = mp.solutions.hands
@@ -99,8 +102,8 @@ def angoloInclinazione(landmarks):
 cap = cv2.VideoCapture(0)
 drawMode = False
 drawingPoints = []
-colors = [(255, 255, 255), (0, 0, 0), (0, 0, 255), (255, 0, 0), (0, 255, 0)]
-colorNames = ("white", "black", "red", "blue", "green")
+colors = [(255, 255, 255), (0, 255, 255), (0, 0, 255), (255, 0, 0), (0, 255, 0)]
+colorNames = ("white", "yellow", "red", "blue", "green")
 thickness = 3
 color = 0
 segments = {}
@@ -135,6 +138,8 @@ while True:
 
     #switch between colors
     if cv2.waitKey(1) == ord('c'):
+        if color == -5:
+            color = 0
         color -= 1
         drawingPoints = []
         if drawMode:
@@ -150,11 +155,12 @@ while True:
             segments["segment"+str(segment)] = (drawingPoints, colors[color], thickness)
             segment += 1
     elif cv2.waitKey(1) == ord('y'):
-        thickness -= 1
-        drawingPoints = []
-        if drawMode:
-            segments["segment"+str(segment)] = (drawingPoints, colors[color], thickness)
-            segment += 1
+        if thickness > 0:
+            thickness -= 1
+            drawingPoints = []
+            if drawMode:
+                segments["segment"+str(segment)] = (drawingPoints, colors[color], thickness)
+                segment += 1
 
 
     #erase screen
@@ -178,10 +184,13 @@ while True:
                 landmarks.append((lmx, lmy))
             if drawMode:
                 drawingPoints.append((landmarks[8][0], landmarks[8][1]))
-            
+
+
 
 
             # Drawing landmarks on frames
+            if drawMode:
+                cv2.rectangle(frame, (0,0), (1280, 720), (0,0,0), 999)
             mpDraw.draw_landmarks(frame, handslms, mpHands.HAND_CONNECTIONS)
 
             #visualizzo sullo schermo
@@ -194,6 +203,7 @@ while True:
             # cv2.putText(frame, v, [10, 80], cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,255,0), 2)
             # cv2.putText(frame, str(nDita), [10, 40], cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,255,0), 2)
             # cv2.putText(frame, str(gradi), [10, 60], cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,255,0), 2)
+
 
     #Disegno partendo dall'indice    
     for i in range(len(segments)):
@@ -223,6 +233,8 @@ while True:
 
     if cv2.waitKey(1) == ord('q'):
         break
+    
+    
     
 
 # release the webcam and destroy all active windows
