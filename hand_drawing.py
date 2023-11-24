@@ -14,16 +14,16 @@ from keras.models import load_model
 
 # initialize mediapipe
 mpHands = mp.solutions.hands
-hands = mpHands.Hands(max_num_hands=1, min_detection_confidence=0.7)
+hands = mpHands.Hands(max_num_hands=1, min_detection_confidence=0.5)
 mpDraw = mp.solutions.drawing_utils
 
 # Load the gesture recognizer model
 model = load_model('mp_hand_gesture')
 
-# # Load class names
-# f = open('gesture.names', 'r')
-# classNames = f.read().split('\n')
-# f.close()
+# Load class names
+f = open('gesture.names', 'r')
+classNames = f.read().split('\n')
+f.close()
 # print(classNames)
 
 #restituisce il verso della mano (palmo--> "PALM" / dorso --> "BACK")
@@ -40,31 +40,31 @@ def verso(landmarks, mano):
 
 #conta il numero di dita
 def numeroDita(landmarks, mano, verso):
-    numero = 0
+    fingersUp = [False, False, False, False, False]
 
     #pollice (dipende dalla mano e dal verso della mano)
     #v1: funziona solo se la mano NON è in pos.orizzontale
     if verso.lower() == "palm":
         if (mano.lower() == "left" and landmarks[4][0] > landmarks[3][0]) or (mano.lower() == "right" and landmarks[4][0] < landmarks[3][0]):
-            numero+=1
+            fingersUp[0] = True
     elif verso.lower() == "back":
         if (mano.lower() == "left" and landmarks[4][0] < landmarks[3][0]) or (mano.lower() == "right" and landmarks[4][0] > landmarks[3][0]):
-            numero+=1
+            fingersUp[0] = True
 
     #indice
     if landmarks[8][1] < landmarks[6][1]:
-        numero+=1
+        fingersUp[1] = True
     #medio
     if landmarks[12][1] < landmarks[10][1]:
-        numero+=1
+        fingersUp[2] = True
     #anulare
     if landmarks[16][1] < landmarks[14][1]: 
-        numero+=1
+        fingersUp[3] = True
     #mignolo
     if landmarks[20][1] < landmarks[18][1]:   
-        numero+=1
+        fingersUp[4] = True
 
-    return numero
+    return fingersUp
 
 #calcola l'angolo di inclinazione della mano (in gradi)
 #restituisce le coordinate del punto medio dei punti 5-9-13-17
@@ -108,6 +108,11 @@ thickness = 3
 color = 0
 segments = {}
 segment = 1
+drawModeswitches = 0
+enableThicknessSwitch = 0
+enableDrawModeSwitch = True
+enableColorSwitch = True
+colorSwitches = 0
 
 while True:
     # Read each frame from the webcam
@@ -127,55 +132,13 @@ while True:
     
     className = ''
 
-    #switch on/off drawing mode
-    if cv2.waitKey(1) == ord('d'):
-        drawMode = not drawMode
-        drawingPoints = []
-        if drawMode:
-            segments["segment"+str(segment)] = (drawingPoints, colors[color], thickness)
-            segment += 1
-            
-
-    #switch between colors
-    if cv2.waitKey(1) == ord('c'):
-        if color == -5:
-            color = 0
-        color -= 1
-        drawingPoints = []
-        if drawMode:
-            segments["segment"+str(segment)] = (drawingPoints, colors[color], thickness)
-            segment += 1
-
-
-    #increase or decrease thickness
-    if cv2.waitKey(1) == ord('t'):
-        thickness += 1
-        drawingPoints = []
-        if drawMode:
-            segments["segment"+str(segment)] = (drawingPoints, colors[color], thickness)
-            segment += 1
-    elif cv2.waitKey(1) == ord('y'):
-        if thickness > 0:
-            thickness -= 1
-            drawingPoints = []
-            if drawMode:
-                segments["segment"+str(segment)] = (drawingPoints, colors[color], thickness)
-                segment += 1
-
-
-    #erase screen
-    if cv2.waitKey(1) == ord('x'):
-        drawMode = False
-        segments = {}
-        segment = 1
-
     # post process the result
     if result.multi_hand_landmarks:
 
         landmarks = []
         for handslms in result.multi_hand_landmarks:
-            # indiceMano = result.multi_hand_landmarks.index(handslms)
-            # etichettaMano = result.multi_handedness[indiceMano].classification[0].label
+            indiceMano = result.multi_hand_landmarks.index(handslms)
+            etichettaMano = result.multi_handedness[indiceMano].classification[0].label
             for lm in handslms.landmark:
                 # print(id, lm)
                 lmx = int(lm.x * x)
@@ -186,7 +149,79 @@ while True:
                 drawingPoints.append((landmarks[8][0], landmarks[8][1]))
 
 
+            # Predict gesture
+            prediction = model.predict([landmarks])
+            # print(prediction)
+            classID = np.argmax(prediction)
+            className = classNames[classID]
 
+
+
+            #increase or decrease thickness
+            if className == "thumbs up":
+                if enableThicknessSwitch == 0:
+                    thickness += 1
+                drawingPoints = []
+                if drawMode:
+                    segments["segment"+str(segment)] = (drawingPoints, colors[color], thickness)
+                    segment += 1
+                enableDrawModeSwitch = False
+                enableColorSwitch = False
+            elif className == "thumbs down":
+                if thickness > 0 and enableThicknessSwitch == 0:
+                    thickness -= 1
+                    drawingPoints = []
+                    if drawMode:
+                        segments["segment"+str(segment)] = (drawingPoints, colors[color], thickness)
+                        segment += 1
+                enableDrawModeSwitch = False
+                enableColorSwitch = False
+            else:
+                enableDrawModeSwitch = True
+                enableColorSwitch = True
+
+            #switch on/off drawing mode
+            if numeroDita(landmarks, etichettaMano, verso(landmarks, etichettaMano))[1]:
+                if enableDrawModeSwitch:
+                    drawMode = True
+                    drawModeswitches+=1
+                    if drawMode and drawModeswitches == 1:
+                        segments["segment"+str(segment)] = (drawingPoints, colors[color], thickness)
+                        segment += 1
+            else:
+                if enableDrawModeSwitch:
+                    drawMode = False
+                    drawModeswitches = 0
+                    drawingPoints = []
+
+
+            #switch between colors
+            if numeroDita(landmarks, etichettaMano, verso(landmarks, etichettaMano))[0]:
+                if enableColorSwitch:
+                    colorSwitches += 1
+                    if colorSwitches == 1:
+                        if color == -5:
+                            color = 0
+                        color -= 1
+                        drawingPoints = []
+                        if drawMode:
+                            segments["segment"+str(segment)] = (drawingPoints, colors[color], thickness)
+                            segment += 1
+                    enableDrawModeSwitch = False
+            else:
+                colorSwitches = 0
+                enableDrawModeSwitch = False
+
+            #erase screen
+            if numeroDita(landmarks, etichettaMano, verso(landmarks, etichettaMano))[1] and numeroDita(landmarks, etichettaMano, verso(landmarks, etichettaMano))[2]:
+                if abs(landmarks[8][0] - landmarks[12][0]) < 30 and abs(landmarks[8][1] - landmarks[12][1]) < 30:
+                    enableDrawModeSwitch = False
+                    enableColorSwitch = False
+                    segments = {}
+                    segment = 1
+            else:
+                enableDrawModeSwitch = True
+                enableColorSwitch = True
 
             # Drawing landmarks on frames
             if drawMode:
@@ -204,6 +239,10 @@ while True:
             # cv2.putText(frame, str(nDita), [10, 40], cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,255,0), 2)
             # cv2.putText(frame, str(gradi), [10, 60], cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,255,0), 2)
 
+    else:
+        drawMode = False
+        drawingPoints = []
+        drawModeswitches = 0
 
     #Disegno partendo dall'indice    
     for i in range(len(segments)):
@@ -216,13 +255,6 @@ while True:
     cv2.putText(frame, "Draw Mode: "+("enabled" if drawMode else "disabled"), [10, 25], cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0) if drawMode else (0, 0, 255), 2)
     cv2.putText(frame, "Color: "+colorNames[color], [10, 60], cv2.FONT_HERSHEY_SIMPLEX, 1, colors[color], 2)
     cv2.putText(frame, "Thickness: "+str(thickness), [10, 95], cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-            
-
-            # # Predict gesture
-            # prediction = model.predict([landmarks])
-            # # print(prediction)
-            # classID = np.argmax(prediction)
-            # className = classNames[classID]
 
     # # show the prediction on the frame
     # cv2.putText(frame, className, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 
@@ -233,6 +265,10 @@ while True:
 
     if cv2.waitKey(1) == ord('q'):
         break
+    
+    enableThicknessSwitch += 1
+    if enableThicknessSwitch == 7:
+        enableThicknessSwitch = 0
     
     
     
