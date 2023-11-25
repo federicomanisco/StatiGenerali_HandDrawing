@@ -10,7 +10,7 @@ from keras.models import load_model
 
 # initialize mediapipe
 mpHands = mp.solutions.hands
-hands = mpHands.Hands(max_num_hands=1, min_detection_confidence=0.5)
+hands = mpHands.Hands(max_num_hands=1, min_detection_confidence=0.7)
 mpDraw = mp.solutions.drawing_utils
 
 # Load the gesture recognizer model
@@ -105,6 +105,8 @@ def angoloInclinazione(landmarks):
 
 # Initialize the webcam
 cap = cv2.VideoCapture(0)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 drawMode = False
 drawingPoints = []
 colors = [(255, 255, 255), (0, 255, 255), (0, 0, 255), (255, 0, 0), (0, 255, 0)]
@@ -118,6 +120,7 @@ enableThicknessSwitch = 0
 enableDrawModeSwitch = True
 enableColorSwitch = True
 colorSwitches = 0
+enableBackGround = False
 
 while True:
     # Read each frame from the webcam
@@ -155,38 +158,40 @@ while True:
 
 
             # Predict gesture
-            prediction = model.predict([landmarks], verbose = False)
-            # print(prediction)
-            classID = np.argmax(prediction)
-            className = classNames[classID]
+            # if not drawMode:
+            #     prediction = model([landmarks])
+            #     # print(prediction)
+            #     classID = np.argmax(prediction)
+            #     className = classNames[classID]
 
-
+            versoMano = verso(landmarks, etichettaMano)
+            ditaAlzate = statoDita(landmarks, etichettaMano, versoMano)
 
             #increase or decrease thickness
-            if className == "thumbs up":
-                if enableThicknessSwitch == 0:
-                    thickness += 1
-                drawingPoints = []
-                if drawMode:
-                    segments["segment"+str(segment)] = (drawingPoints, colors[color], thickness)
-                    segment += 1
-                enableDrawModeSwitch = False
-                enableColorSwitch = False
-            elif className == "thumbs down":
-                if thickness > 0 and enableThicknessSwitch == 0:
-                    thickness -= 1
-                    drawingPoints = []
-                    if drawMode:
-                        segments["segment"+str(segment)] = (drawingPoints, colors[color], thickness)
-                        segment += 1
-                enableDrawModeSwitch = False
-                enableColorSwitch = False
-            else:
-                enableDrawModeSwitch = True
-                enableColorSwitch = True
+            # if className == "thumbs up":
+            #     if enableThicknessSwitch == 0:
+            #         thickness += 1
+            #     drawingPoints = []
+            #     if drawMode:
+            #         segments["segment"+str(segment)] = (drawingPoints, colors[color], thickness)
+            #         segment += 1
+            #     enableDrawModeSwitch = False
+            #     enableColorSwitch = False
+            # elif className == "thumbs down":
+            #     if thickness > 0 and enableThicknessSwitch == 0:
+            #         thickness -= 1
+            #         drawingPoints = []
+            #         if drawMode:
+            #             segments["segment"+str(segment)] = (drawingPoints, colors[color], thickness)
+            #             segment += 1
+            #     enableDrawModeSwitch = False
+            #     enableColorSwitch = False
+            # else:
+            #     enableDrawModeSwitch = True
+            #     enableColorSwitch = True
 
             #switch on/off drawing mode
-            if numeroDita(landmarks, etichettaMano, verso(landmarks, etichettaMano)) == 1 and statoDita(landmarks, etichettaMano, verso(landmarks, etichettaMano))[1]:
+            if numeroDita(landmarks, etichettaMano, versoMano) == 1 and ditaAlzate[1]:
                 if enableDrawModeSwitch:
                     drawMode = True
                     drawModeswitches+=1
@@ -199,6 +204,8 @@ while True:
                     drawModeswitches = 0
                     drawingPoints = []
 
+            if drawMode:
+                enableBackGround = True
 #            if numeroDita(landmarks, etichettaMano, verso(landmarks, etichettaMano))[1]:
 #                if enableDrawModeSwitch:
 #                    drawMode = True
@@ -212,8 +219,10 @@ while True:
 #                    drawModeswitches = 0
 #                    drawingPoints = []
 
+
+
             #switch between colors
-            if statoDita(landmarks, etichettaMano, verso(landmarks, etichettaMano))[0]:
+            if ditaAlzate[0] and ditaAlzate[1] and ditaAlzate[2] and not ditaAlzate[3] and not ditaAlzate[4] and abs(landmarks[4][0] - landmarks[5][0])**2 / 10 > 50:
                 if enableColorSwitch:
                     colorSwitches += 1
                     if colorSwitches == 1:
@@ -230,10 +239,11 @@ while True:
                 enableDrawModeSwitch = False
 
             #erase screen
-            if statoDita(landmarks, etichettaMano, verso(landmarks, etichettaMano))[1] and statoDita(landmarks, etichettaMano, verso(landmarks, etichettaMano))[2]:
-                if abs(landmarks[8][0] - landmarks[12][0]) < 30 and abs(landmarks[8][1] - landmarks[12][1]) < 30:
+            if ditaAlzate[0] and ditaAlzate[1] and ditaAlzate[2] and ditaAlzate[3] and ditaAlzate[4]:
+                if not className == "thumbs up" or not className == "thumbs down":
                     enableDrawModeSwitch = False
                     enableColorSwitch = False
+                    enableBackGround = False
                     segments = {}
                     segment = 1
             else:
@@ -241,7 +251,7 @@ while True:
                 enableColorSwitch = True
 
             # Drawing landmarks on frames
-            if drawMode:
+            if enableBackGround:
                 cv2.rectangle(frame, (0,0), (1280, 720), (0,0,0), 999)
             mpDraw.draw_landmarks(frame, handslms, mpHands.HAND_CONNECTIONS)
 
@@ -271,7 +281,7 @@ while True:
         
     cv2.putText(frame, "Draw Mode: "+("enabled" if drawMode else "disabled"), [10, 25], cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0) if drawMode else (0, 0, 255), 2)
     cv2.putText(frame, "Color: "+colorNames[color], [10, 60], cv2.FONT_HERSHEY_SIMPLEX, 1, colors[color], 2)
-    cv2.putText(frame, "Thickness: "+str(thickness), [10, 95], cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+    # cv2.putText(frame, "Thickness: "+str(thickness), [10, 95], cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
     # # show the prediction on the frame
     # cv2.putText(frame, className, (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 

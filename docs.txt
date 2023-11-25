@@ -3,4 +3,3 @@ https://techvidvan.com/tutorials/hand-gesture-recognition-tensorflow-opencv/
 
 documentazione di mediapipe (non è il massimo ma è il meglio che ho trovato)
 https://developers.google.com/mediapipe/solutions/vision/gesture_recognizer/python#image_2
-prova555
